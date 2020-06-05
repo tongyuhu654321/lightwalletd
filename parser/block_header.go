@@ -7,8 +7,8 @@ import (
 	"log"
 	"math/big"
 
-	"github.com/pkg/errors"
 	"github.com/adityapk00/lightwalletd/parser/internal/bytestring"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -45,15 +45,20 @@ type rawBlockHeader struct {
 
 	// An encoded version of the target threshold this block's header hash must
 	// be less than or equal to, in the same nBits format used by Bitcoin.
-	NBitsBytes []byte
+	NBitsBytes uint32
 
 	// An arbitrary field that miners can change to modify the header hash in
 	// order to produce a hash less than or equal to the target threshold.
-	Nonce []byte
+	Nonce uint64
 
 	// The Equihash solution. In the wire format, this is a
 	// CompactSize-prefixed value.
 	Solution []byte
+
+	genSign    []byte
+	plotID     []byte
+	baseTarget uint64
+	deadline   uint64
 }
 
 type blockHeader struct {
@@ -149,16 +154,32 @@ func (hdr *blockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
 		return in, errors.New("could not read timestamp")
 	}
 
-	if ok := s.ReadBytes(&hdr.NBitsBytes, 4); !ok {
+	if ok := s.ReadUint32(&hdr.NBitsBytes); !ok {
 		return in, errors.New("could not read NBits bytes")
 	}
 
-	if ok := s.ReadBytes(&hdr.Nonce, 32); !ok {
+	if ok := s.ReadUint64(&hdr.Nonce); !ok {
 		return in, errors.New("could not read Nonce bytes")
 	}
 
 	if ok := s.ReadCompactLengthPrefixed((*bytestring.String)(&hdr.Solution)); !ok {
 		return in, errors.New("could not read CompactSize-prefixed Equihash solution")
+	}
+
+	if ok := s.ReadBytes(&hdr.genSign, 32); !ok {
+		return in, errors.New("could not read genSign bytes")
+	}
+
+	if ok := s.ReadBytes(&hdr.plotID, 20); !ok {
+		return in, errors.New("could not read plotID bytes")
+	}
+
+	if ok := s.ReadUint64(&hdr.baseTarget); !ok {
+		return in, errors.New("could not read baseTarget bytes")
+	}
+
+	if ok := s.ReadUint64(&hdr.deadline); !ok {
+		return in, errors.New("could not read deadline bytes")
 	}
 
 	// TODO: interpret the bytes
